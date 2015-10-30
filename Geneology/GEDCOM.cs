@@ -9,6 +9,110 @@ using System.IO;
 
 namespace Genealogy
 {
+	public class Individual
+	{
+		private string _firstName;
+		private string _middleName;
+		private string _surName;
+
+		public string Id { get; set; }
+		public string Name { get; set; }
+		public string FirstName {
+			get
+			{
+				//The first name will be the first part of the string before any the '/' or a ' '.
+				if (Name.Contains('/'))
+				{
+					string cutname = Name.Remove(Name.IndexOf('/'), Name.IndexOf('/') - Name.LastIndexOf('/'));
+					if (cutname.Contains(' '))
+					{
+						return cutname.Split(' ')[0];
+					}
+					else
+					{
+						return null;
+					}
+				}
+				else if(Name.Contains(' '))
+				{
+					return Name.Split(' ')[0];
+				}
+				else
+				{
+					return null;
+				}
+			}
+			set;
+		}
+		public string MiddleName {
+			get
+			{
+				//The first name will be the first part of the string before any the '/' or a ' '.
+				if (Name.Contains('/'))
+				{
+					string cutname = Name.Remove(Name.IndexOf('/'), Name.IndexOf('/') - Name.LastIndexOf('/'));
+					if (cutname.Contains(' '))
+					{
+						return cutname.Split(' ')[(Name.Length-1)];
+					}
+					else
+					{
+						return null;
+					}
+				}
+				else if(Name.Contains(' '))
+				{
+					return Name.Split(' ')[(Name.Length-1)];
+				}
+				else
+				{
+					return null;
+				}
+			}
+			set;
+		}
+		public string SurName {
+			get
+			{
+				if (_surName != null)
+				{
+					return _surName;
+				}
+				else
+				{
+					if (Name.Contains('/'))
+					{
+						string[] nameSplit = Name.Split('/');
+						_surName = nameSplit[1];
+						return _surName;
+					}
+					else
+					{
+						return null;
+					}
+				}
+			}
+			set;
+		}
+		public string Sex { get; set; }
+		public BirthEvent BirthEvent { get; set; }
+		public DeathEvent DeathEvent { get; set; }
+		public bool IsDead 
+		{ 
+			get {
+				if (DeathEvent != null)
+				{
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			} 
+		}
+		public List<Event> LifeEvents { get; set; }
+	}
+
     public class Family
     {
         public string Id { get; set; }
@@ -18,21 +122,6 @@ namespace Genealogy
         public List<Individual> Children { get; set; }
     }
     
-    public class MarriageEvent
-    {
-        public string Place { get; set; }
-        public string Date { get; set; }
-    }
-    
-    public class Individual
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Sex { get; set; }
-        public BirthEvent BirthEvent { get; set; }
-        public DeathEvent DeathEvent { get; set; }
-    }
-
     public class Event
     {
         public string Type { get; set; }
@@ -50,23 +139,62 @@ namespace Genealogy
         
     }
 
-    
+	public class MarriageEvent : Event
+	{
 
+	}
+	
+	//Custom Errors
+	
+	//Individuals must be included in the same file where a family record is located.
+	private class IndividualNotFound : Exception 
+	{ 
+		public IndividualNotFound()
+		{
+		}
 
+		public IndividualNotFound(string message)
+			: base(message)
+		{
+		}
+
+		public IndividualNotFound(string message, Exception inner)
+			: base(message, inner)
+		{
+		}		
+	}
+	
     class GEDCOM
     {
         private const string VERSION = "5.5.1";
         private const string CORP = "Cory Brown";
 
+		// accessible lists
+		public List<Individual> individuals = new List<Individual>();
+		public List<Family> families = new List<Family>();
+
+		//Constructors
+		public GEDCOM()
+		{
+			//Empty Default
+		}
+		/// <summary>
+		/// Imports a GEDCOM file from a filepath
+		/// </summary>
+		/// <param name="filePath">Path to a .gedcom file</param>
         public GEDCOM(string filePath)
         {
-            try
+            ReadFromFile(filePath);
+        }
+
+		/// <summary>
+		/// Reads from file and attempts to fill Individuals
+		/// </summary>
+		public void ReadFromFile(string filePath)
+		{
+			try
             {
                 StreamReader sr = new StreamReader(filePath);
-
-                //Put together our list of individuals and families
-                List<Individual> individuals = new List<Individual>();
-                List<Family> families = new List<Family>();
 
                 //create individual blocks
                 string[] zeroLines = sr.ReadToEnd().Replace("0 @", "\u0646").Split('\u0646');
@@ -90,43 +218,21 @@ namespace Genealogy
                         if (FindIndexinArray(lines, "1 BIRT ") != -1)
                         {
                             BirthEvent be = new BirthEvent();
+							
+							be = GetEventData<BirthEvent>(lines, "BIRT");
 
-                            // add birthday event
-                            int i = 1;
-                            while (lines[FindIndexinArray(lines, "1 BIRT ") + i].StartsWith("2"))
-                            {
-                                switch (lines[FindIndexinArray(lines, "1 BIRT ") + i].Substring(0,5))
-                                {
-                                    case "2 Date":
-                                        be.Date = lines[FindIndexinArray(lines, "1 BIRT ") + 1].Replace("2 DATE ", "").Trim();
-                                        break;
-                                    case "2 Plac":
-                                        be.Place = lines[FindIndexinArray(lines, "1 BIRT ") + 2].Replace("2 PLAC ", "").Trim();
-                                        break;
-                                }   
-                            }
+							indi.BirthEvent = be;
                         }
                         #endregion
 
                         #region Death Event
                         if (FindIndexinArray(lines, "1 DEAT ") != -1)
                         {
-                            BirthEvent be = new BirthEvent();
+                            DeathEvent de = new DeathEvent();
+							
+							de = GetEventData<DeathEvent>(lines, "DEAT");
 
-                            // add birthday event
-                            int i = 1;
-                            while (lines[FindIndexinArray(lines, "1 DEAT ") + i].StartsWith("2"))
-                            {
-                                switch (lines[FindIndexinArray(lines, "1 DEAT ") + i].Substring(0, 5))
-                                {
-                                    case "2 Date":
-                                        be.Date = lines[FindIndexinArray(lines, "1 DEAT ") + 1].Replace("2 DATE ", "").Trim();
-                                        break;
-                                    case "2 Plac":
-                                        be.Place = lines[FindIndexinArray(lines, "1 DEAT ") + 2].Replace("2 PLAC ", "").Trim();
-                                        break;
-                                }
-                            }
+							indi.DeathEvent = de;
                         }
                         #endregion
 
@@ -137,21 +243,25 @@ namespace Genealogy
                     {
                         //Create the new family and marriage
                         Family fam = new Family();
-                        MarriageEvent mar = new MarriageEvent();
+                        
 
                         //grab Fam id from node early on to keep from doing it over and over
                         fam.Id = lines[0].Replace("@ FAM", "");
 
-                        //Look for Marriage Event, deal with alternate events.
-                        foreach (string line in lines)
-                        {
-
-                        }
-
-
                         // Look at each line of node
                         foreach (string line in lines)
                         {
+							//Look for a Marriage Event
+							if (line.Contains("1 MARR "))
+							{
+								MarriageEvent mar = new MarriageEvent();
+								
+								mar = GetEventData<MarriageEvent>(lines, "MARR");
+
+								fam.MarriageEvent = mar;
+							}
+
+
                             /* So as an explanation, Gedcom uses Husband/Wife nomenclature. Gedcom explains that this is because the Marriage Event is
                             a record of a union that produced a child and is strictly a matter of bloodline. This will inevitably change when the LDS
                             changes their own family record keeping 
@@ -164,30 +274,42 @@ namespace Genealogy
                             {
                                 string indId = line.Replace("1 HUSB ", "").Replace("@", "").Trim();
                                 Individual temp = (Individual)individuals.Where(indi => indi.Id.ToString().Equals(indId));
-                                if (temp != null)
-                                {
-                                    fam.Husband = temp;
-                                }
+								if (temp != null)
+								{
+									fam.Husband = temp;
+								}
+								else
+								{
+									throw new IndividualNotFound("Husband: " + indId + " Not found in record for " + fam.Id);
+								}
                             }
                             //If node for Wife
                             else if (line.Contains("1 WIFE "))
                             {
                                 string indId = line.Replace("1 WIFE ", "").Replace("@", "").Trim();
                                 Individual temp = (Individual)individuals.Where(indi => indi.Id.ToString().Equals(indId));
-                                if (temp != null)
-                                {
-                                    fam.Wife = temp;
-                                }
+								if (temp != null)
+								{
+									fam.Wife = temp;
+								}
+								else
+								{
+									throw new IndividualNotFound("Wife: " + indId + " Not found in record for " + fam.Id);
+								}
                             }
                             //if node for multi children
                             else if (line.Contains("1 CHIL "))
                             {
                                 string indId = line.Replace("1 CHIL ", "").Replace("@", "").Trim();
                                 Individual temp = (Individual)individuals.Where(indi => indi.Id.ToString().Equals(indId));
-                                if (temp != null)
-                                {
-                                    fam.Children.Add(temp);
-                                }
+								if (temp != null)
+								{
+									fam.Children.Add(temp);
+								}
+								else
+								{
+									throw new IndividualNotFound("Child: " + indId + " Not found in record for " + fam.Id);
+								}
                             }
                         }
                     }   
@@ -197,8 +319,51 @@ namespace Genealogy
             {
                 throw new NotImplementedException(e.Message);
             }
-        }
 
+		}
+
+		public bool CreateNewFile(string filePath)
+		{
+			throw new NotImplementedException("Creating a File is not yet implemented");
+		}
+		/// <summary>
+		/// Generic Event reader. Will not pull any event unique data
+		/// </summary>
+		/// <typeparam name="T">Event Class Type</typeparam>
+		/// <param name="lines">Lines of Code where event is located</param>
+		/// <param name="eventCode">Event Code, ie. MARR, BIRT, DEAT</param>
+		/// <returns>Event cast as requested type</returns>
+		private T GetEventData<T>(string[] lines, string eventCode) where T : Event
+		{
+			Event newEvent = new Event();
+			foreach (string line in lines)
+			{
+				if (line.Contains("1 "+ eventCode +" "))
+				{
+					
+					int i = 1;
+					while (lines[FindIndexinArray(lines, "1 " + eventCode + " ") + i].StartsWith("2"))
+					{
+						switch (lines[FindIndexinArray(lines, "1 " + eventCode + " ") + i].Substring(0, 5))
+						{
+							case "2 DATE":
+								newEvent.Date = lines[FindIndexinArray(lines, "1 " + eventCode + " ") + 1].Replace("2 DATE ", "").Trim();
+								break;
+							case "2 PLAC":
+								newEvent.Place = lines[FindIndexinArray(lines, "1 " + eventCode + " ") + 2].Replace("2 PLAC ", "").Trim();
+								break;
+						}
+					}
+				}
+			}
+			return (T)Convert.ChangeType(newEvent, typeof(T));
+		}
+		/// <summary>
+		/// Finds the last index in an array that contains the search string
+		/// </summary>
+		/// <param name="Arr">Haystack - Searched Array</param>
+		/// <param name="search">Needle - search string</param>
+		/// <returns>Zero-based array index, or -1 for error</returns>
         private int FindIndexinArray(string[] Arr, string search)
         {
             int Val = -1;

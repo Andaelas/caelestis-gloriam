@@ -8,7 +8,8 @@ namespace Genealogy
 {
     public class Person
     {
-        #region Attributes
+
+		#region Attributes
         private string _firstName;
         private string _middleName;
         private string _lastName;
@@ -19,11 +20,11 @@ namespace Genealogy
         private string _deathCertText;
         private string _gedcomCode;
 
-        #endregion
-        
+		#endregion
 
-        //Properties
-        public string FirstName
+
+		#region Properties
+		public string FirstName
         {
             get
             {
@@ -135,7 +136,7 @@ namespace Genealogy
                 _gedcomCode = value;
             }
         }
-
+		#endregion
         
     }
 }
