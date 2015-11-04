@@ -9,6 +9,13 @@ using System.IO;
 
 namespace Genealogy
 {
+	public class GedcomCollection
+	{
+		// accessible lists
+		public List<Individual> individuals = new List<Individual>();
+		public List<Family> families = new List<Family>();
+	}
+
 	public class Individual
 	{
 		private string _firstName;
@@ -122,7 +129,7 @@ namespace Genealogy
         public List<Individual> Children { get; set; }
     }
     
-    public class Event
+    private interface Event
     {
         public string Type { get; set; }
         public string Place { get; set; }
@@ -131,17 +138,17 @@ namespace Genealogy
 
     public class BirthEvent : Event
     {
-
+		public string Type = "BIRT";
     }
     
     public class DeathEvent : Event
     {
-        
+		public string Type = "DEAT";
     }
 
 	public class MarriageEvent : Event
 	{
-
+		public string Type = "MARR";
 	}
 	
 	//Custom Errors
@@ -168,11 +175,7 @@ namespace Genealogy
     {
         private const string VERSION = "5.5.1";
         private const string CORP = "Cory Brown";
-
-		// accessible lists
-		public List<Individual> individuals = new List<Individual>();
-		public List<Family> families = new List<Family>();
-
+		
 		//Constructors
 		public GEDCOM()
 		{
@@ -182,157 +185,154 @@ namespace Genealogy
 		/// Imports a GEDCOM file from a filepath
 		/// </summary>
 		/// <param name="filePath">Path to a .gedcom file</param>
-        public GEDCOM(string filePath)
+        public GedcomCollection GEDCOM(string filePath)
         {
-            ReadFromFile(filePath);
+            return ReadFromFile(filePath);
         }
 
 		/// <summary>
 		/// Reads from file and attempts to fill Individuals
 		/// </summary>
-		public void ReadFromFile(string filePath)
+		/// <returns>
+		/// A Collection of 
+		/// </returns>
+		public GedcomCollection ReadFromFile(string filePath)
 		{
-			try
-            {
-				string[] zeroLines;
-				if (!filePath.EndsWith(".ged"))
+			GedcomCollection gcc = new GedcomCollection();
+			string[] zeroLines;
+			if (!filePath.EndsWith(".ged"))
+			{
+				throw new Exception("File is not a GedCom File");
+			}
+			using (StreamReader sr = new StreamReader(filePath))
+			{
+				if (sr != null)
 				{
-					throw new Exception("File is not a GedCom File");
+					//create individual blocks
+					zeroLines = sr.ReadToEnd().Replace("0 @", "\u0646").Split('\u0646');
 				}
-				using (StreamReader sr = new StreamReader(filePath))
+				else
 				{
-					if (sr != null)
-					{
-						//create individual blocks
-						zeroLines = sr.ReadToEnd().Replace("0 @", "\u0646").Split('\u0646');
-					}
-					else
-					{
-						throw new NullReferenceException("StreamReader failed to create a stream from path: "+filePath);
-					}
+					throw new NullReferenceException("StreamReader failed to create a stream from path: "+filePath);
 				}
-				foreach (string block in zeroLines)
+			}
+			foreach (string block in zeroLines)
+			{
+				//cut these pieces into lines for parsing
+				string[] lines = block.Replace("\r\n", "\r").Split('\r');
+
+				if (lines[0].Contains("INDI"))
 				{
-					//cut these pieces into lines for parsing
-					string[] lines = block.Replace("\r\n", "\r").Split('\r');
+					//create a new individual
+					Individual indi = new Individual();
+					//Find, replace junk characters, and save data.
+					indi.Id = lines[0].Replace("@", "").Replace(" INDI", "").Trim();
+					indi.Name = lines[FindIndexinArray(lines, "NAME")].Replace("1 NAME", "").Replace("/", "").Trim();
+					indi.Sex = lines[FindIndexinArray(lines, "SEX")].Replace("1 SEX ", "").Trim();
 
-					if (lines[0].Contains("INDI"))
+					//special conditional data
+
+					#region Birth Event
+					if (FindIndexinArray(lines, "1 BIRT ") != -1)
 					{
-						//create a new individual
-						Individual indi = new Individual();
-						//Find, replace junk characters, and save data.
-						indi.Id = lines[0].Replace("@", "").Replace(" INDI", "").Trim();
-						indi.Name = lines[FindIndexinArray(lines, "NAME")].Replace("1 NAME", "").Replace("/", "").Trim();
-						indi.Sex = lines[FindIndexinArray(lines, "SEX")].Replace("1 SEX ", "").Trim();
+						BirthEvent be = new BirthEvent();
 
-						//special conditional data
+						be = GetEventData<BirthEvent>(lines, be.Type);
 
-						#region Birth Event
-						if (FindIndexinArray(lines, "1 BIRT ") != -1)
-						{
-							BirthEvent be = new BirthEvent();
-
-							be = GetEventData<BirthEvent>(lines, "BIRT");
-
-							indi.BirthEvent = be;
-						}
-						#endregion
-
-						#region Death Event
-						if (FindIndexinArray(lines, "1 DEAT ") != -1)
-						{
-							DeathEvent de = new DeathEvent();
-
-							de = GetEventData<DeathEvent>(lines, "DEAT");
-
-							indi.DeathEvent = de;
-						}
-						#endregion
-
-						// Throw the Individual into the List
-						individuals.Add(indi);
+						indi.BirthEvent = be;
 					}
-					else if (lines[0].Contains("FAM"))
+					#endregion
+
+					#region Death Event
+					if (FindIndexinArray(lines, "1 DEAT ") != -1)
 					{
-						//Create the new family and marriage
-						Family fam = new Family();
+						DeathEvent de = new DeathEvent();
+
+						de = GetEventData<DeathEvent>(lines, de.Type);
+
+						indi.DeathEvent = de;
+					}
+					#endregion
+
+					// Throw the Individual into the List
+					gcc.individuals.Add(indi);
+				}
+				else if (lines[0].Contains("FAM"))
+				{
+					//Create the new family and marriage
+					Family fam = new Family();
 
 
-						//grab Fam id from node early on to keep from doing it over and over
-						fam.Id = lines[0].Replace("@ FAM", "");
+					//grab Fam id from node early on to keep from doing it over and over
+					fam.Id = lines[0].Replace("@ FAM", "");
 
-						// Look at each line of node
-						foreach (string line in lines)
+					// Look at each line of node
+					foreach (string line in lines)
+					{
+						//Look for a Marriage Event
+						if (line.Contains("1 MARR "))
 						{
-							//Look for a Marriage Event
-							if (line.Contains("1 MARR "))
-							{
-								MarriageEvent mar = new MarriageEvent();
+							MarriageEvent mar = new MarriageEvent();
 
-								mar = GetEventData<MarriageEvent>(lines, "MARR");
+							mar = GetEventData<MarriageEvent>(lines, mar.Type);
 
-								fam.MarriageEvent = mar;
-							}
+							fam.MarriageEvent = mar;
+						}
 
 
-							/* So as an explanation, Gedcom uses Husband/Wife nomenclature. Gedcom explains that this is because the Marriage Event is
-							a record of a union that produced a child and is strictly a matter of bloodline. This will inevitably change when the LDS
-							changes their own family record keeping 
+						/* So as an explanation, Gedcom uses Husband/Wife nomenclature. Gedcom explains that this is because the Marriage Event is
+						a record of a union that produced a child and is strictly a matter of bloodline. This will inevitably change when the LDS
+						changes their own family record keeping 
                             
-							My own software will allow for adoption events and be gender neutral regarding spouses (but will likely still only allow two
-							participants until marriage law changes) */
+						My own software will allow for adoption events and be gender neutral regarding spouses (but will likely still only allow two
+						participants until marriage law changes) */
 
-							// If node is HUSB
-							if (line.Contains("1 HUSB "))
+						// If node is HUSB
+						if (line.Contains("1 HUSB "))
+						{
+							string indId = line.Replace("1 HUSB ", "").Replace("@", "").Trim();
+							Individual temp = (Individual)gcc.individuals.Where(indi => indi.Id.ToString().Equals(indId));
+							if (temp != null)
 							{
-								string indId = line.Replace("1 HUSB ", "").Replace("@", "").Trim();
-								Individual temp = (Individual)individuals.Where(indi => indi.Id.ToString().Equals(indId));
-								if (temp != null)
-								{
-									fam.Husband = temp;
-								}
-								else
-								{
-									throw new IndividualNotFound("Husband: " + indId + " Not found in record for " + fam.Id);
-								}
+								fam.Husband = temp;
 							}
-							//If node for Wife
-							else if (line.Contains("1 WIFE "))
+							else
 							{
-								string indId = line.Replace("1 WIFE ", "").Replace("@", "").Trim();
-								Individual temp = (Individual)individuals.Where(indi => indi.Id.ToString().Equals(indId));
-								if (temp != null)
-								{
-									fam.Wife = temp;
-								}
-								else
-								{
-									throw new IndividualNotFound("Wife: " + indId + " Not found in record for " + fam.Id);
-								}
+								throw new IndividualNotFound("Husband: " + indId + " Not found in record for " + fam.Id);
 							}
-							//if node for multi children
-							else if (line.Contains("1 CHIL "))
+						}
+						//If node for Wife
+						else if (line.Contains("1 WIFE "))
+						{
+							string indId = line.Replace("1 WIFE ", "").Replace("@", "").Trim();
+							Individual temp = (Individual)gcc.individuals.Where(indi => indi.Id.ToString().Equals(indId));
+							if (temp != null)
 							{
-								string indId = line.Replace("1 CHIL ", "").Replace("@", "").Trim();
-								Individual temp = (Individual)individuals.Where(indi => indi.Id.ToString().Equals(indId));
-								if (temp != null)
-								{
-									fam.Children.Add(temp);
-								}
-								else
-								{
-									throw new IndividualNotFound("Child: " + indId + " Not found in record for " + fam.Id);
-								}
+								fam.Wife = temp;
+							}
+							else
+							{
+								throw new IndividualNotFound("Wife: " + indId + " Not found in record for " + fam.Id);
+							}
+						}
+						//if node for multi children
+						else if (line.Contains("1 CHIL "))
+						{
+							string indId = line.Replace("1 CHIL ", "").Replace("@", "").Trim();
+							Individual temp = (Individual)gcc.individuals.Where(indi => indi.Id.ToString().Equals(indId));
+							if (temp != null)
+							{
+								fam.Children.Add(temp);
+							}
+							else
+							{
+								throw new IndividualNotFound("Child: " + indId + " Not found in record for " + fam.Id);
 							}
 						}
 					}
 				}
-            }
-            catch(Exception e)
-            {
-                throw new NotImplementedException(e.Message);
-            }
-
+			}
+			return gcc;
 		}
 
 		public bool CreateNewFile(string filePath)
@@ -348,7 +348,7 @@ namespace Genealogy
 		/// <returns>Event cast as requested type</returns>
 		private T GetEventData<T>(string[] lines, string eventCode) where T : Event
 		{
-			Event newEvent = new Event();
+			Event newEvent = default(T);
 			foreach (string line in lines)
 			{
 				if (line.Contains("1 "+ eventCode +" "))
