@@ -117,7 +117,7 @@ namespace Genealogy
 				}
 			} 
 		}
-		public List<IEvent> LifeEvents { get; set; }
+		public List<Event> LifeEvents { get; set; }
 	}
 
     public class Family
@@ -129,24 +129,24 @@ namespace Genealogy
         public List<Individual> Children { get; set; }
     }
     
-    private interface IEvent
+    private class Event
     {
         public string Type { get; set; }
         public string Place { get; set; }
         public string Date { get; set; }
     }
 
-    public class BirthEvent : IEvent
+    public class BirthEvent : Event
     {
 		public string Type = "BIRT";
     }
     
-    public class DeathEvent : IEvent
+    public class DeathEvent : Event
     {
 		public string Type = "DEAT";
     }
 
-	public class MarriageEvent : IEvent
+	public class MarriageEvent : Event
 	{
 		public string Type = "MARR";
 	}
@@ -237,7 +237,7 @@ namespace Genealogy
 					{
 						BirthEvent be = new BirthEvent();
 
-						be = GetEventData<BirthEvent>(lines, be.Type);
+						be = GetEventData<BirthEvent>(lines);
 
 						indi.BirthEvent = be;
 					}
@@ -248,7 +248,7 @@ namespace Genealogy
 					{
 						DeathEvent de = new DeathEvent();
 
-						de = GetEventData<DeathEvent>(lines, de.Type);
+						de = GetEventData<DeathEvent>(lines);
 
 						indi.DeathEvent = de;
 					}
@@ -274,7 +274,7 @@ namespace Genealogy
 						{
 							MarriageEvent mar = new MarriageEvent();
 
-							mar = GetEventData<MarriageEvent>(lines, mar.Type);
+							mar = GetEventData<MarriageEvent>(lines);
 
 							fam.MarriageEvent = mar;
 						}
@@ -346,24 +346,24 @@ namespace Genealogy
 		/// <param name="lines">Lines of Code where event is located</param>
 		/// <param name="eventCode">Event Code, ie. MARR, BIRT, DEAT</param>
 		/// <returns>Event cast as requested type</returns>
-		private T GetEventData<T>(string[] lines, string eventCode) where T : IEvent
+		private T GetEventData<T>(string[] lines) where T : Event
 		{
-			IEvent newEvent = default(T);
+			Event newEvent = default(T);
 			foreach (string line in lines)
 			{
-				if (line.Contains("1 "+ eventCode +" "))
+				if (line.Contains("1 "+ newEvent.Type +" "))
 				{
 					
 					int i = 1;
-					while (lines[FindIndexinArray(lines, "1 " + eventCode + " ") + i].StartsWith("2"))
+					while (lines[FindIndexinArray(lines, "1 " + newEvent.Type + " ") + i].StartsWith("2"))
 					{
-						switch (lines[FindIndexinArray(lines, "1 " + eventCode + " ") + i].Substring(0, 5))
+						switch (lines[FindIndexinArray(lines, "1 " + newEvent.Type + " ") + i].Substring(0, 5))
 						{
 							case "2 DATE":
-								newEvent.Date = lines[FindIndexinArray(lines, "1 " + eventCode + " ") + 1].Replace("2 DATE ", "").Trim();
+								newEvent.Date = lines[FindIndexinArray(lines, "1 " + newEvent.Type + " ") + 1].Replace("2 DATE ", "").Trim();
 								break;
 							case "2 PLAC":
-								newEvent.Place = lines[FindIndexinArray(lines, "1 " + eventCode + " ") + 2].Replace("2 PLAC ", "").Trim();
+								newEvent.Place = lines[FindIndexinArray(lines, "1 " + newEvent.Type + " ") + 2].Replace("2 PLAC ", "").Trim();
 								break;
 						}
 					}
