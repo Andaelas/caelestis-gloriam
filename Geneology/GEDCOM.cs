@@ -117,7 +117,7 @@ namespace Genealogy
 				}
 			} 
 		}
-		public List<Event> LifeEvents { get; set; }
+		public List<IEvent> LifeEvents { get; set; }
 	}
 
     public class Family
@@ -129,24 +129,24 @@ namespace Genealogy
         public List<Individual> Children { get; set; }
     }
     
-    private class Event
+    private interface IEvent
     {
-        public string Type { get; set; }
+		public string Type { get { throw new Exception("Type must be overriden."); } }
         public string Place { get; set; }
         public string Date { get; set; }
     }
 
-    public class BirthEvent : Event
+    public class BirthEvent : IEvent
     {
 		public string Type = "BIRT";
     }
     
-    public class DeathEvent : Event
+    public class DeathEvent : IEvent
     {
 		public string Type = "DEAT";
     }
 
-	public class MarriageEvent : Event
+	public class MarriageEvent : IEvent
 	{
 		public string Type = "MARR";
 	}
@@ -346,9 +346,9 @@ namespace Genealogy
 		/// <param name="lines">Lines of Code where event is located</param>
 		/// <param name="eventCode">Event Code, ie. MARR, BIRT, DEAT</param>
 		/// <returns>Event cast as requested type</returns>
-		private T GetEventData<T>(string[] lines) where T : Event
+		private T GetEventData<T>(string[] lines) where T : IEvent, new()
 		{
-			Event newEvent = default(T);
+			T newEvent = new T();// default(T);
 			foreach (string line in lines)
 			{
 				if (line.Contains("1 "+ newEvent.Type +" "))
@@ -369,7 +369,7 @@ namespace Genealogy
 					}
 				}
 			}
-			return (T)Convert.ChangeType(newEvent, typeof(T));
+			return newEvent;
 		}
 		/// <summary>
 		/// Finds the last index in an array that contains the search string
